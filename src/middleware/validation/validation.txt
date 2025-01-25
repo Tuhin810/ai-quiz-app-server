@@ -1,0 +1,18 @@
+Here's how you can implement a secure password verification function using the crypto package instead of bcrypt. 
+This will match the pattern (salt:hash) set during password hashing.
+
+Retrieve Salt and Hash:
+
+The stored password follows the salt:hash pattern (set during hashing).
+The split(":") method separates the salt and hash values.
+Hash the Provided Password:
+
+The crypto.pbkdf2Sync() function uses the stored salt to hash the password provided in the request.
+It ensures the hashing process matches the original.
+Compare Hashes:
+
+The hash generated from the provided password is compared to the stored hash.
+If they match, the password is valid.
+Error Handling:
+
+If hashing fails or the hashes don't match, appropriate error messages are returned.
