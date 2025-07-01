@@ -2,53 +2,95 @@ import { Request, Response } from "express";
 import QuizModel from "../../../../models/quiz.model";
 import QuestionModel from "../../../../models/question.model";
 import OptionModel from "../../../../models/option.model";
-import { MESSAGE } from "../../../../constants/message";
 import UserQuizAttemptModel from "../../../../models/userAttempt.model";
+import { MESSAGE } from "../../../../constants/message";
 
 export const getQuizForAttempt = async (req: Request, res: Response) => {
 	try {
 		const { quizId, userId } = req.query;
 
-		// Check if the user has already attempted the quiz
-		const previousAttempt = await UserQuizAttemptModel.findOne({
-			user_id: userId,
-			quiz_id: quizId
-		});
-
-		if (previousAttempt) {
-			return res.status(200).json({
-				message: "You've already attempted this quiz.",
-				attempted: true,
-				score: previousAttempt.score
-			});
-		}
-
-		// Fetch the quiz
+		// Step 1: Fetch quiz
 		const quiz = await QuizModel.findById(quizId);
 		if (!quiz) {
 			return res.status(404).json({ message: "Quiz not found." });
 		}
 
-		// Fetch questions
+		// Step 2: Fetch all questions
 		const questions = await QuestionModel.find({ quiz_id: quizId });
 
-		// Fetch options for each question (but hide is_correct)
-		const questionsWithOptions = await Promise.all(
-			questions.map(async (q) => {
-				const options = await OptionModel.find({ question_id: q._id }).select("-is_correct");
+		// Step 3: Check if already attempted
+		const previousAttempt = await UserQuizAttemptModel.findOne({
+			user_id: userId,
+			quiz_id: quizId
+		});
+
+		// Step 4: Fetch options
+		const questionOptionMap: Record<string, any[]> = {};
+		for (const question of questions) {
+			const options = await OptionModel.find({ question_id: question._id });
+			questionOptionMap[question._id.toString()] = options;
+		}
+
+		// If already attempted
+		if (previousAttempt) {
+			const answerMap: Record<string, string> = {};
+			previousAttempt.answers.forEach((a: any) => {
+				answerMap[a.question_id.toString()] = a.selected_option_id.toString();
+			});
+
+			const questionsWithAnswers = questions.map((q) => {
+				const opts = questionOptionMap[q._id.toString()];
+				const correctOption = opts.find((o) => o.is_correct);
+				const selectedOptionId = answerMap[q._id.toString()];
+				const selectedOption = opts.find((o) => o._id.toString() === selectedOptionId);
+
 				return {
 					question_id: q._id,
 					text: q.text,
-					options: options.map((opt) => ({
-						option_id: opt._id,
-						text: opt.text
-					}))
+					options: opts.map((o) => ({
+						option_id: o._id,
+						text: o.text
+					})),
+					selectedOption: selectedOption
+						? { option_id: selectedOption._id, text: selectedOption.text }
+						: null,
+					correctOption: {
+						option_id: correctOption._id,
+						text: correctOption.text
+					},
+					isCorrect: selectedOption && correctOption._id.equals(selectedOption._id)
 				};
-			})
-		);
+			});
+
+			return res.status(200).json({
+				message: "You've already attempted this quiz.",
+				attempted: true,
+				score: previousAttempt.score,
+				quiz: {
+					_id: quiz._id,
+					title: quiz.title,
+					description: quiz.description
+				},
+				questions: questionsWithAnswers
+			});
+		}
+
+		// If not attempted, return basic question data
+		const questionsWithOptions = questions.map((q) => {
+			const opts = questionOptionMap[q._id.toString()];
+			return {
+				question_id: q._id,
+				text: q.text,
+				options: opts.map((o) => ({
+					option_id: o._id,
+					text: o.text
+				}))
+			};
+		});
 
 		return res.status(200).json({
 			message: MESSAGE.get.succ,
+			attempted: false,
 			quiz: {
 				_id: quiz._id,
 				title: quiz.title,
