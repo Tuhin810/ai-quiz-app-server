@@ -1,56 +1,65 @@
-import { Request, Response } from "express";
+import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import { Request, Response } from "express";
 import UserModel from "../../../../models/user.model";
-import { MESSAGE } from "../../../../constants/message";
-import { JWT_SECRET } from "../../../../config/config";
+const JWT_SECRET = "HSIIJSN";
 
+export const handleUserAuth = async (req: Request, res: Response) => {
+	try {
+		const { email, password, role } = req.body;
 
-export const signUpUser = async (req: Request, res: Response) => {
-  try {
-    const { full_name, age, phone, gender, address, password } = req.body;
+		if (!email || !password || role === undefined) {
+			return res.status(400).json({
+				message: "Missing required fields"
+			});
+		}
 
-    const newUser = await new UserModel({
-      full_name,
-      age,
-      phone,
-      gender,
-      address,
-      password, 
-    }).save();
+		const user = await UserModel.findOne({ email });
 
-    const token = jwt.sign({ id: newUser._id }, JWT_SECRET);
+		if (user) {
+			// 👉 Login Flow - plain password check
+			if (user.password !== password) {
+				return res.status(401).json({
+					message: "Invalid credentials"
+				});
+			}
 
-    return res.status(200).json({
-      message:  MESSAGE.post.succ,
-      token,
-      result: newUser,
-    });
-  } catch (error) {
-    console.error(error);
-    return res.status(400).json({
-      message:  MESSAGE.post.fail,
-      error: error,
-    });
-  }
-};
+			const token = jwt.sign({ id: user._id }, JWT_SECRET, {
+				expiresIn: "7d"
+			});
 
+			return res.status(200).json({
+				message: "Login successful",
+				token,
+				result: user,
+				isNewUser: false
+			});
+		} else {
+			// 👉 Signup Flow
+			const newUser = new UserModel({
+				email,
+				password,
+				role
+			});
 
-export const loginUser = async (req: any, res: Response) => {
-  try {
-    const userInstance = req.user; 
+			const savedUser = await newUser.save();
 
-    const token = jwt.sign({ id: userInstance._id }, JWT_SECRET);
+			const token = jwt.sign({ id: savedUser._id }, JWT_SECRET, {
+				expiresIn: "7d"
+			});
 
-    return res.status(200).json({
-      message: MESSAGE.post.succ,
-      token,
-      result: userInstance,
-    });
-  } catch (error) {
-    console.error("Error during login:", error);
-    return res.status(400).json({
-      message: MESSAGE.post.fail,
-      error: error,
-    });
-  }
+			return res.status(201).json({
+				message: "Signup successful",
+				token,
+				result: savedUser,
+				isNewUser: true
+			});
+		}
+	} catch (error) {
+		console.error("Auth Error:", error);
+		return res.status(500).json({
+			message: "Authentication failed",
+			error
+		});
+	}
 };
