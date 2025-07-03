@@ -191,15 +191,12 @@ export const getAttemptedQuizzes = async (req: Request, res: Response) => {
 		const attempts: any = await UserQuizAttemptModel.find({ user_id: userId })
 			.populate({
 				path: "quiz_id",
-				model: QuizModel,
-				select: "title description"
+				model: QuizModel
 			})
 			.sort({ attemptedAt: -1 });
 
 		const attemptedQuizzes = attempts.map((attempt: any) => ({
-			quizId: attempt.quiz_id._id,
-			title: attempt.quiz_id.title,
-			description: attempt.quiz_id.description,
+			quiz: attempt.quiz_id,
 			score: attempt.score,
 			totalQuestions: attempt.answers.length,
 			attemptedAt: attempt.attemptedAt
@@ -207,7 +204,7 @@ export const getAttemptedQuizzes = async (req: Request, res: Response) => {
 
 		return res.status(200).json({
 			message: MESSAGE.get.succ,
-			attemptedQuizzes
+			result: attemptedQuizzes
 		});
 	} catch (error) {
 		console.error("Error fetching attempted quizzes:", error);

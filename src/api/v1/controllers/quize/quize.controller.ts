@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import QuizModel from "../../../../models/quiz.model";
 import { MESSAGE } from "../../../../constants/message";
 import UserQuizAttemptModel from "../../../../models/userAttempt.model";
+import QuestionModel from "../../../../models/question.model";
 
 // Create a new quiz (Admin only)
 export const createQuiz = async (req: Request, res: Response) => {
@@ -36,7 +37,8 @@ export const createQuiz = async (req: Request, res: Response) => {
 
 export const getUnattemptedQuizzes = async (req: Request, res: Response) => {
 	try {
-		const { userId } = req.query; // Or use req.query.userId if you’re not using auth middleware
+		const { userId } = req.query;
+
 		if (!userId) {
 			return res.status(400).json({ message: "User ID is required" });
 		}
@@ -50,9 +52,20 @@ export const getUnattemptedQuizzes = async (req: Request, res: Response) => {
 			_id: { $nin: attemptedQuizIds }
 		}).select("title description tags createdAt");
 
+		// 📚 Step 3: For each unattempted quiz, count the questions
+		const quizzesWithQuestionCount = await Promise.all(
+			unattemptedQuizzes.map(async (quiz) => {
+				const questionCount = await QuestionModel.countDocuments({ quiz_id: quiz._id });
+				return {
+					quiz,
+					questionCount
+				};
+			})
+		);
+
 		return res.status(200).json({
 			message: MESSAGE.get.succ,
-			unattemptedQuizzes
+			result: quizzesWithQuestionCount
 		});
 	} catch (error) {
 		console.error("Error fetching unattempted quizzes:", error);
