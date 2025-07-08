@@ -55,14 +55,13 @@ export const addQuestionToQuiz = async (req: Request, res: Response) => {
 
 export const addMultipleQuestionsToQuiz = async (req: Request, res: Response) => {
 	try {
-		const { quizId } = req.query; // use params, not query
+		const { quizId } = req.query;
 		const { questions } = req.body;
 
 		if (!Array.isArray(questions) || questions.length === 0) {
 			return res.status(400).json({ message: "At least one question is required." });
 		}
 
-		// ✅ Filter valid questions first
 		const validQuestions = questions.filter(
 			(q) =>
 				q.text &&
@@ -77,16 +76,13 @@ export const addMultipleQuestionsToQuiz = async (req: Request, res: Response) =>
 			return res.status(400).json({ message: "No valid questions to insert." });
 		}
 
-		// ✅ Create question docs in memory
 		const questionDocs = validQuestions.map((q) => ({
 			quiz_id: quizId,
 			text: q.text
 		}));
 
-		// ✅ Bulk insert questions
 		const insertedQuestions = await QuestionModel.insertMany(questionDocs);
 
-		// ✅ Prepare all options in memory
 		const allOptionDocs: any = [];
 
 		insertedQuestions.forEach((question, idx) => {
@@ -102,7 +98,6 @@ export const addMultipleQuestionsToQuiz = async (req: Request, res: Response) =>
 			});
 		});
 
-		// ✅ Bulk insert options
 		const insertedOptions = await OptionModel.insertMany(allOptionDocs);
 
 		return res.status(200).json({

@@ -43,16 +43,13 @@ export const getUnattemptedQuizzes = async (req: Request, res: Response) => {
 			return res.status(400).json({ message: "User ID is required" });
 		}
 
-		// 🧠 Step 1: Get attempted quiz IDs
 		const attempts = await UserQuizAttemptModel.find({ user_id: userId }).select("quiz_id");
 		const attemptedQuizIds = attempts.map((a) => a.quiz_id.toString());
 
-		// 📦 Step 2: Get quizzes NOT attempted
 		const unattemptedQuizzes = await QuizModel.find({
 			_id: { $nin: attemptedQuizIds }
 		}).select("title description tags createdAt");
 
-		// 📚 Step 3: For each unattempted quiz, count the questions
 		const quizzesWithQuestionCount = await Promise.all(
 			unattemptedQuizzes.map(async (quiz) => {
 				const questionCount = await QuestionModel.countDocuments({ quiz_id: quiz._id });
@@ -89,7 +86,6 @@ export const getQuizzesWithAttemptCount = async (req: Request, res: Response) =>
 			});
 		}
 
-		// Step 2: Get attempt count for each quiz
 		const attemptStats = await UserQuizAttemptModel.aggregate([
 			{
 				$match: {
@@ -104,7 +100,6 @@ export const getQuizzesWithAttemptCount = async (req: Request, res: Response) =>
 			}
 		]);
 
-		// Step 3: Map quiz + count
 		const result = quizzes.map((quiz) => {
 			const stat = attemptStats.find((s) => s._id.toString() === quiz._id.toString());
 			return {
